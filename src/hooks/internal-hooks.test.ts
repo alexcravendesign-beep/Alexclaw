@@ -1,4 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { mockLogger } = vi.hoisted(() => {
+  return {
+    mockLogger: {
+      error: vi.fn(),
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn().mockReturnThis(),
+    },
+  };
+});
+
+vi.mock("../logging/subsystem.js", () => ({
+  createSubsystemLogger: vi.fn(() => mockLogger),
+}));
+
 import {
   clearInternalHooks,
   createInternalHookEvent,
@@ -17,6 +34,7 @@ import {
 describe("hooks", () => {
   beforeEach(() => {
     clearInternalHooks();
+    mockLogger.error.mockClear();
   });
 
   afterEach(() => {
@@ -121,7 +139,6 @@ describe("hooks", () => {
     });
 
     it("should catch and log errors from handlers", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
       const errorHandler = vi.fn(() => {
         throw new Error("Handler failed");
       });
@@ -135,12 +152,12 @@ describe("hooks", () => {
 
       expect(errorHandler).toHaveBeenCalled();
       expect(successHandler).toHaveBeenCalled();
-      expect(consoleError).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining("Hook error"),
+      );
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining("Handler failed"),
       );
-
-      consoleError.mockRestore();
     });
 
     it("should not throw if no handlers are registered", async () => {
@@ -340,7 +357,6 @@ describe("hooks", () => {
     });
 
     it("should handle hook errors without breaking message processing", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
       const errorHandler = vi.fn(() => {
         throw new Error("Hook failed");
       });
@@ -361,12 +377,12 @@ describe("hooks", () => {
       expect(errorHandler).toHaveBeenCalled();
       expect(successHandler).toHaveBeenCalled();
       // Error was logged but didn't prevent second handler
-      expect(consoleError).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining("Hook error"),
+      );
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining("Hook failed"),
       );
-
-      consoleError.mockRestore();
     });
   });
 

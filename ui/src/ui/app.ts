@@ -51,6 +51,10 @@ import {
 } from "./app-tool-stream.ts";
 import type { AppViewState } from "./app-view-state.ts";
 import { normalizeAssistantIdentity } from "./assistant-identity.ts";
+import {
+  createAgent as createAgentInternal,
+  deleteAgent as deleteAgentInternal,
+} from "./controllers/agents.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
@@ -213,6 +217,10 @@ export class OpenClawApp extends LitElement {
   @state() agentsSelectedId: string | null = null;
   @state() agentsPanel: "overview" | "files" | "tools" | "skills" | "channels" | "cron" =
     "overview";
+  @state() agentCreating = false;
+  @state() agentCreateError: string | null = null;
+  @state() agentDeleting = false;
+  @state() agentDeleteError: string | null = null;
   @state() agentFilesLoading = false;
   @state() agentFilesError: string | null = null;
   @state() agentFilesList: AgentsFilesListResult | null = null;
@@ -417,6 +425,14 @@ export class OpenClawApp extends LitElement {
 
   async loadAssistantIdentity() {
     await loadAssistantIdentityInternal(this);
+  }
+
+  async handleCreateAgent(name: string) {
+    await createAgentInternal(this, name);
+  }
+
+  async handleDeleteAgent(agentId: string) {
+    await deleteAgentInternal(this, agentId);
   }
 
   applySettings(next: UiSettings) {

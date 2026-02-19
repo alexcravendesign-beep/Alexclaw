@@ -36,6 +36,12 @@ export type AgentsProps = {
   agentsList: AgentsListResult | null;
   selectedAgentId: string | null;
   activePanel: AgentsPanel;
+  agentCreating: boolean;
+  agentCreateError: string | null;
+  agentDeleting: boolean;
+  agentDeleteError: string | null;
+  onCreateAgent: (name: string) => void;
+  onDeleteAgent: (agentId: string) => void;
   configForm: Record<string, unknown> | null;
   configLoading: boolean;
   configSaving: boolean;
@@ -111,13 +117,29 @@ export function renderAgents(props: AgentsProps) {
             <div class="card-title">Agents</div>
             <div class="card-sub">${agents.length} configured.</div>
           </div>
-          <button class="btn btn--sm" ?disabled=${props.loading} @click=${props.onRefresh}>
-            ${props.loading ? "Loading…" : "Refresh"}
-          </button>
+          <div class="row" style="gap: 8px;">
+            <button
+              class="btn btn--sm"
+              ?disabled=${props.agentCreating || props.loading}
+              @click=${() => {
+                const name = window.prompt("Enter new agent name:");
+                if (name) {
+                  props.onCreateAgent(name);
+                }
+              }}
+            >
+              ${props.agentCreating ? "Creating…" : "New"}
+            </button>
+            <button class="btn btn--sm" ?disabled=${props.loading} @click=${props.onRefresh}>
+              ${props.loading ? "Loading…" : "Refresh"}
+            </button>
+          </div>
         </div>
         ${
-          props.error
-            ? html`<div class="callout danger" style="margin-top: 12px;">${props.error}</div>`
+          props.error || props.agentCreateError
+            ? html`<div class="callout danger" style="margin-top: 12px;">
+                ${props.error || props.agentCreateError}
+              </div>`
             : nothing
         }
         <div class="agent-list" style="margin-top: 12px;">
@@ -161,6 +183,13 @@ export function renderAgents(props: AgentsProps) {
                   selectedAgent,
                   defaultId,
                   props.agentIdentityById[selectedAgent.id] ?? null,
+                  props.agentDeleting,
+                  props.agentDeleteError,
+                  (id) => {
+                    if (window.confirm(`Delete agent "${id}" and all its data?`)) {
+                      props.onDeleteAgent(id);
+                    }
+                  },
                 )}
                 ${renderAgentTabs(props.activePanel, (panel) => props.onSelectPanel(panel))}
                 ${
@@ -289,11 +318,16 @@ function renderAgentHeader(
   agent: AgentsListResult["agents"][number],
   defaultId: string | null,
   agentIdentity: AgentIdentityResult | null,
+  deleting: boolean,
+  deleteError: string | null,
+  onDelete: (id: string) => void,
 ) {
   const badge = agentBadgeText(agent.id, defaultId);
   const displayName = normalizeAgentLabel(agent);
   const subtitle = agent.identity?.theme?.trim() || "Agent workspace and routing.";
   const emoji = resolveAgentEmoji(agent, agentIdentity);
+  const isDefault = defaultId && agent.id === defaultId;
+
   return html`
     <section class="card agent-header">
       <div class="agent-header-main">
@@ -301,11 +335,25 @@ function renderAgentHeader(
         <div>
           <div class="card-title">${displayName}</div>
           <div class="card-sub">${subtitle}</div>
+          ${deleteError ? html`<div class="callout danger inline">${deleteError}</div>` : nothing}
         </div>
       </div>
       <div class="agent-header-meta">
         <div class="mono">${agent.id}</div>
         ${badge ? html`<span class="agent-pill">${badge}</span>` : nothing}
+        ${
+          !isDefault
+            ? html`
+                <button
+                  class="btn btn--sm danger"
+                  ?disabled=${deleting}
+                  @click=${() => onDelete(agent.id)}
+                >
+                  ${deleting ? "Deleting…" : "Delete"}
+                </button>
+              `
+            : nothing
+        }
       </div>
     </section>
   `;

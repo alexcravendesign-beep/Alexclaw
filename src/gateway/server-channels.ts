@@ -134,7 +134,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
       return;
     }
 
-    await Promise.all(
+    await Promise.allSettled(
       accountIds.map(async (id) => {
         if (store.tasks.has(id)) {
           return;
@@ -174,91 +174,105 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
           manuallyStopped.delete(rKey);
         }
 
-        const abort = new AbortController();
-        store.aborts.set(id, abort);
         if (!preserveRestartAttempts) {
           restartAttempts.delete(rKey);
         }
-        setRuntime(channelId, id, {
-          accountId: id,
-          enabled: true,
-          configured: true,
-          running: true,
-          lastStartAt: Date.now(),
-          lastError: null,
-          reconnectAttempts: preserveRestartAttempts ? (restartAttempts.get(rKey) ?? 0) : 0,
-        });
 
         const log = channelLogs[channelId];
-        const task = startAccount({
-          cfg,
-          accountId: id,
-          account,
-          runtime: channelRuntimeEnvs[channelId],
-          abortSignal: abort.signal,
-          log,
-          getStatus: () => getRuntime(channelId, id),
-          setStatus: (next) => setRuntime(channelId, id, next),
-        });
-        const trackedPromise = Promise.resolve(task)
-          .catch((err) => {
-            const message = formatErrorMessage(err);
-            setRuntime(channelId, id, { accountId: id, lastError: message });
-            log.error?.(`[${id}] channel exited: ${message}`);
-          })
-          .finally(() => {
-            setRuntime(channelId, id, {
-              accountId: id,
-              running: false,
-              lastStopAt: Date.now(),
-            });
-          })
-          .then(async () => {
+
+        const loop = async () => {
+          while (true) {
+            // Check if we should stop before starting
             if (manuallyStopped.has(rKey)) {
-              return;
+              break;
             }
-            const attempt = (restartAttempts.get(rKey) ?? 0) + 1;
-            restartAttempts.set(rKey, attempt);
-            if (attempt > MAX_RESTART_ATTEMPTS) {
-              log.error?.(`[${id}] giving up after ${MAX_RESTART_ATTEMPTS} restart attempts`);
-              return;
-            }
-            const delayMs = computeBackoff(CHANNEL_RESTART_POLICY, attempt);
-            log.info?.(
-              `[${id}] auto-restart attempt ${attempt}/${MAX_RESTART_ATTEMPTS} in ${Math.round(delayMs / 1000)}s`,
-            );
+
+            const abort = new AbortController();
+            store.aborts.set(id, abort);
+
+            const attempt = restartAttempts.get(rKey) ?? 0;
             setRuntime(channelId, id, {
               accountId: id,
+              enabled: true,
+              configured: true,
+              running: true,
+              lastStartAt: Date.now(),
+              lastError: null,
               reconnectAttempts: attempt,
             });
+
             try {
-              await sleepWithAbort(delayMs, abort.signal);
-              if (manuallyStopped.has(rKey)) {
-                return;
-              }
-              if (store.tasks.get(id) === trackedPromise) {
-                store.tasks.delete(id);
-              }
+              // Wait for the account to "finish" (crash or stop)
+              await startAccount({
+                cfg,
+                accountId: id,
+                account,
+                runtime: channelRuntimeEnvs[channelId],
+                abortSignal: abort.signal,
+                log,
+                getStatus: () => getRuntime(channelId, id),
+                setStatus: (next) => setRuntime(channelId, id, next),
+              });
+            } catch (err) {
+              // Channel crashed
+              const message = formatErrorMessage(err);
+              setRuntime(channelId, id, { accountId: id, lastError: message });
+              log.error?.(`[${id}] channel exited: ${message}`);
+            } finally {
+              // Cleanup current run
               if (store.aborts.get(id) === abort) {
                 store.aborts.delete(id);
               }
-              await startChannelInternal(channelId, id, {
-                preserveRestartAttempts: true,
-                preserveManualStop: true,
+              setRuntime(channelId, id, {
+                accountId: id,
+                running: false,
+                lastStopAt: Date.now(),
               });
+            }
+
+            if (manuallyStopped.has(rKey) || abort.signal.aborted) {
+              break;
+            }
+
+            // Restart logic
+            const nextAttempt = (restartAttempts.get(rKey) ?? 0) + 1;
+            restartAttempts.set(rKey, nextAttempt);
+
+            if (nextAttempt > MAX_RESTART_ATTEMPTS) {
+              log.error?.(`[${id}] giving up after ${MAX_RESTART_ATTEMPTS} restart attempts`);
+              break;
+            }
+
+            const delayMs = computeBackoff(CHANNEL_RESTART_POLICY, nextAttempt);
+            log.info?.(
+              `[${id}] auto-restart attempt ${nextAttempt}/${MAX_RESTART_ATTEMPTS} in ${Math.round(delayMs / 1000)}s`,
+            );
+            setRuntime(channelId, id, {
+              accountId: id,
+              reconnectAttempts: nextAttempt,
+            });
+
+            // Wait for backoff or manual stop
+            try {
+              // Create a temporary abort for the sleep so we can wake up on stopChannel
+              const sleepAbort = new AbortController();
+              // If stopped during sleep, stopChannel will call abort() on the *previous* controller?
+              // No, we deleted it in finally.
+              // We need to put something in store.aborts so stopChannel can cancel the sleep.
+              store.aborts.set(id, sleepAbort);
+              await sleepWithAbort(delayMs, sleepAbort.signal);
             } catch {
-              // abort or startup failure — next crash will retry
-            }
-          })
-          .finally(() => {
-            if (store.tasks.get(id) === trackedPromise) {
-              store.tasks.delete(id);
-            }
-            if (store.aborts.get(id) === abort) {
+              // sleep aborted (likely manual stop)
+            } finally {
               store.aborts.delete(id);
             }
-          });
-        store.tasks.set(id, trackedPromise);
+          }
+          // Loop finished
+          store.tasks.delete(id);
+        };
+
+        const loopPromise = loop();
+        store.tasks.set(id, loopPromise);
       }),
     );
   };
@@ -324,9 +338,8 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
   };
 
   const startChannels = async () => {
-    for (const plugin of listChannelPlugins()) {
-      await startChannel(plugin.id);
-    }
+    const plugins = listChannelPlugins();
+    await Promise.allSettled(plugins.map((plugin) => startChannel(plugin.id)));
   };
 
   const markChannelLoggedOut = (channelId: ChannelId, cleared: boolean, accountId?: string) => {
