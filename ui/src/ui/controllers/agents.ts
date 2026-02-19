@@ -8,6 +8,10 @@ export type AgentsState = {
   agentsError: string | null;
   agentsList: AgentsListResult | null;
   agentsSelectedId: string | null;
+  agentCreating: boolean;
+  agentCreateError: string | null;
+  agentDeleting: boolean;
+  agentDeleteError: string | null;
 };
 
 export async function loadAgents(state: AgentsState) {
@@ -33,5 +37,43 @@ export async function loadAgents(state: AgentsState) {
     state.agentsError = String(err);
   } finally {
     state.agentsLoading = false;
+  }
+}
+
+export async function createAgent(state: AgentsState, name: string) {
+  if (!state.client || !state.connected || state.agentCreating) {
+    return;
+  }
+  state.agentCreating = true;
+  state.agentCreateError = null;
+  try {
+    const res = await state.client.request<{ agentId: string }>("agents.create", { name });
+    if (res && res.agentId) {
+      state.agentsSelectedId = res.agentId;
+      await loadAgents(state);
+    }
+  } catch (err) {
+    state.agentCreateError = String(err);
+  } finally {
+    state.agentCreating = false;
+  }
+}
+
+export async function deleteAgent(state: AgentsState, agentId: string) {
+  if (!state.client || !state.connected || state.agentDeleting) {
+    return;
+  }
+  state.agentDeleting = true;
+  state.agentDeleteError = null;
+  try {
+    await state.client.request("agents.delete", { agentId });
+    if (state.agentsSelectedId === agentId) {
+      state.agentsSelectedId = null;
+    }
+    await loadAgents(state);
+  } catch (err) {
+    state.agentDeleteError = String(err);
+  } finally {
+    state.agentDeleting = false;
   }
 }

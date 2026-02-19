@@ -554,7 +554,9 @@
 .field select:focus {
   border-color: var(--accent);
   background: rgba(0, 240, 255, 0.05);
-  box-shadow: 0 0 10px var(--accent-subtle), inset 0 0 0 1px var(--accent-subtle);
+  box-shadow:
+    0 0 10px var(--accent-subtle),
+    inset 0 0 0 1px var(--accent-subtle);
 }
 
 .field select {
@@ -782,7 +784,9 @@
 
 .list-item-clickable:hover {
   border-color: var(--accent);
-  box-shadow: 0 0 15px var(--accent-subtle), inset 0 0 10px rgba(0, 240, 255, 0.05);
+  box-shadow:
+    0 0 15px var(--accent-subtle),
+    inset 0 0 10px rgba(0, 240, 255, 0.05);
   transform: translateX(4px);
 }
 
@@ -1748,7 +1752,9 @@
   border: 1px solid var(--accent);
   background: rgba(10, 16, 26, 0.8);
   backdrop-filter: blur(10px);
-  box-shadow: 0 0 15px rgba(0, 240, 255, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 0 15px rgba(0, 240, 255, 0.1),
+    inset 0 0 20px rgba(0, 0, 0, 0.3);
   transition:
     border-color var(--duration-fast) ease,
     box-shadow var(--duration-fast) ease;
@@ -1756,7 +1762,9 @@
 
 .chat-compose__field textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 20px var(--accent-subtle), inset 0 0 10px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 0 20px var(--accent-subtle),
+    inset 0 0 10px rgba(0, 0, 0, 0.2);
 }
 
 .chat-compose__field textarea:disabled {
@@ -1823,7 +1831,9 @@
   border-radius: var(--radius-lg);
   padding: 24px;
   animation: scale-in 0.2s var(--ease-out);
-  box-shadow: 0 0 50px rgba(0, 240, 255, 0.15), inset 0 0 20px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 0 50px rgba(0, 240, 255, 0.15),
+    inset 0 0 20px rgba(0, 0, 0, 0.5);
   position: relative;
 }
 
@@ -2156,7 +2166,9 @@
 
 .agent-file-row.active {
   border-color: var(--accent);
-  box-shadow: 0 0 10px var(--accent-subtle), inset 0 0 10px rgba(0, 240, 255, 0.1);
+  box-shadow:
+    0 0 10px var(--accent-subtle),
+    inset 0 0 10px rgba(0, 240, 255, 0.1);
 }
 
 .agent-file-name {

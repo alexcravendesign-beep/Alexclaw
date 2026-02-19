@@ -128,6 +128,10 @@ export type AppViewState = {
   agentsError: string | null;
   agentsSelectedId: string | null;
   agentsPanel: "overview" | "files" | "tools" | "skills" | "channels" | "cron";
+  agentCreating: boolean;
+  agentCreateError: string | null;
+  agentDeleting: boolean;
+  agentDeleteError: string | null;
   agentFilesLoading: boolean;
   agentFilesError: string | null;
   agentFilesList: AgentsFilesListResult | null;
@@ -270,6 +274,8 @@ export type AppViewState = {
   handleLoadLogs: () => Promise<void>;
   handleDebugCall: () => Promise<void>;
   handleRunUpdate: () => Promise<void>;
+  handleCreateAgent: (name: string) => Promise<void>;
+  handleDeleteAgent: (agentId: string) => Promise<void>;
   setPassword: (next: string) => void;
   setSessionKey: (next: string) => void;
   setChatMessage: (next: string) => void;

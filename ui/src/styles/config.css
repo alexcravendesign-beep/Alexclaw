@@ -13,7 +13,9 @@
   border: 1px solid var(--border);
   background: var(--glass-bg);
   backdrop-filter: blur(15px);
-  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), inset 0 0 2px rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 0 30px rgba(0, 0, 0, 0.5),
+    inset 0 0 2px rgba(255, 255, 255, 0.05);
   overflow: hidden;
 }
 
@@ -772,7 +774,9 @@
 }
 
 .cfg-toggle input:focus + .cfg-toggle__track {
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--accent);
 }
 
 /* Object (collapsible) */
